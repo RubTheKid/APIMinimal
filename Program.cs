@@ -8,7 +8,6 @@ builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("Tare
 
 var app = builder.Build();
 
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -16,10 +15,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("yo kanye", async () => 
-    await new HttpClient().GetStringAsync("https://api.kanye.rest")
-    );
+    await new HttpClient().GetStringAsync("https://api.kanye.rest"));
 
 app.MapGet("/tarefas", async (AppDbContext db) => await db.Tarefas.ToListAsync());
+
+app.MapGet("/tarefas/{id}", async (int id, AppDbContext db) =>
+    await db.Tarefas.FindAsync(id) is Tarefa tarefa ? Results.Ok(tarefa) : Results.NotFound("tarefa não encontrada!"));
+
+app.MapGet("/tarefas/concluida", async (AppDbContext db) =>
+    await db.Tarefas.Where(t => t.IsConcluida).ToListAsync());
 
 app.MapPost("/tarefas", async (Tarefa tarefa, AppDbContext db) =>
     {
@@ -27,6 +31,32 @@ app.MapPost("/tarefas", async (Tarefa tarefa, AppDbContext db) =>
         await db.SaveChangesAsync();
         return Results.Created($"/tarefas/{tarefa.Id}", tarefa);
     }
+);
+
+app.MapPut("/tarefas/{id}", async (int id, Tarefa inputTarefa, AppDbContext db) =>
+{
+    var tarefa = await db.Tarefas.FindAsync(id);
+
+    if (tarefa is null) return Results.NotFound();
+
+    tarefa.Nome = inputTarefa.Nome;
+    tarefa.IsConcluida = inputTarefa.IsConcluida;
+
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}
+);
+
+app.MapDelete("/tarefas/{id}", async (int id, AppDbContext db) =>
+{
+    if (await db.Tarefas.FindAsync(id) is Tarefa tarefa)
+    {
+        db.Tarefas.Remove(tarefa);
+        await db.SaveChangesAsync();
+        return Results.Ok(tarefa);
+    }
+    return Results.NotFound("Tarefa Não Encontrada!");
+}
 );
 
 app.Run();
